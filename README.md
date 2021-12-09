@@ -74,6 +74,30 @@ After some customization:
 
 Coingecko allows 50 calls a minute, so for my own use-case I am fetching the data once a minute and store it in the redis cache, so that the api fetches the data from cache, so I can call my api as much as I want, the only downside is that the data will be a minute old.
 
+We can see from redis that our data was cached:
+
+```
+docker exec -it rates-cache sh -c "redis-cli -n 1 keys \*"
+1) "MATIC_TO_USD"
+2) "LINK_TO_USD"
+3) "DOGE_TO_USD"
+4) "XRP_TO_USD"
+5) "ADA_TO_USD"
+6) "VET_TO_USD"
+7) "TRX_TO_USD"
+8) "ETH_TO_USD"
+9) "BTC_TO_USD"
+```
+
+And to get the value of BTC in USD:
+
+```
+docker exec -it rates-cache sh -c "redis-cli -n 1 get BTC_TO_USD"
+"49272"
+```
+
+Our Flask API uses the redis cache to fetch the values, and can be accessed like this:
+
 ```
 curl http://api.127.0.0.1.nip.io:5000/coins/btc
 {"acronymm":"BTC","current_price_in_usd":"49533"}
