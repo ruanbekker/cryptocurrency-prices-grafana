@@ -4,16 +4,29 @@ Fetching Cryptocurrency Prices from Coingecko and Displaying them on Grafana
 ## About
 
 This stack consists of:
-- Prometheus
-- Pushgateway
-- Grafana
-- Redis
+- Prometheus (timeseries database)
+- Pushgateway (introduces a /metrics endpoint for prometheus to scrape)
+- Grafana (the best)
+- Redis (k/v in memory store)
 - Python Script that pulls crypto market data, publishes to pushgateway for prometheus to scrape, and stores market data in Redis
 - Flask API to fetch market prices for other projects
 
 I'm using coingecko's api which gives me 50 free calls per minute.
 
 ## Walkthrough
+
+Clone the repo:
+
+```
+git clone https://github.com/ruanbekker/cryptocurrency-prices-grafana
+```
+
+Change to the directory and build/start the containers:
+
+```
+cd cryptocurrency-prices-grafana
+docker-compose up -d --build
+```
 
 Accessing Grafana, for me its locally on http://grafana.127.0.0.1.nip.io:3000
 
