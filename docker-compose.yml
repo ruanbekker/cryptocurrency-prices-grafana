@@ -1,0 +1,133 @@
+version: "3.8"
+
+services:
+  rates-cache:
+    image: redis:alpine
+    container_name: rates-cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 64m
+    networks:
+      - public
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  rates-shipper:
+    container_name: rates-shipper
+    build: crypto
+    environment:
+      - PG_ENDPOINT=http://pushgateway:9091
+      - REDIS_HOST=rates-cache
+      - REDIS_PORT=6379
+      - REDIS_TTL=60
+      - DELAY_INTERVAL=15
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 128m
+    depends_on:
+      rates-cache:
+        condition: service_healthy
+      pushgateway:
+        condition: service_started
+    networks:
+      - public
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  coins-api:
+    container_name: coins-api
+    build: api
+    environment:
+      - REDIS_HOST=rates-cache
+      - REDIS_PORT=6379
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 128m
+    ports:
+      - 5000:5000
+    depends_on:
+      rates-cache:
+        condition: service_healthy
+    networks:
+      - public
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    user: root
+    restart: unless-stopped
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./data/prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.external-url=http://prometheus.localhost.nip.io:9090'
+      - '--log.level=info'
+    networks:
+      - public
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./data/grafana/data:/var/lib/grafana
+      - ./configs/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    environment:
+      - GF_SERVER_ROOT_URL=http://grafana.localhost.nip.io:3000
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - PROMETHEUS_ENDPOINT=http://prometheus:9090
+    networks:
+      - public
+    user: root
+    ports:
+      - 3000:3000
+    depends_on:
+      prometheus:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  pushgateway:
+    image: prom/pushgateway
+    container_name: pushgateway
+    restart: unless-stopped
+    ports:
+      - 9091:9091
+    networks:
+      - public
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+networks:
+  public:
+    name: public
+
